@@ -1,0 +1,24 @@
+.chatContainer {
+    overflow-y: auto; /* Enable vertical scrolling */
+    max-height: calc(100vh - 200px); /* Adjust this to fit your layout */
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: #888 transparent; /* For Firefox */
+  }
+  
+  .chatContainer::-webkit-scrollbar {
+    width: 8px; /* Width of the scrollbar */
+  }
+  
+  .chatContainer::-webkit-scrollbar-track {
+    background: transparent; /* Background of the scrollbar track */
+  }
+  
+  .chatContainer::-webkit-scrollbar-thumb {
+    background-color: #888; /* Color of the scrollbar thumb */
+    border-radius: 4px; /* Roundness of the scrollbar thumb */
+  }
+  
+  .chatContainer::-webkit-scrollbar-thumb:hover {
+    background-color: #555; /* Darker color on hover */
+  }
+  

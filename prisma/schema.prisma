@@ -1,0 +1,100 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+
+  accounts      Account[]
+  sessions      Session[]
+  messages      Message[]
+  chatRooms     UserChatRoom[]
+  ownedRooms    ChatRoom[] @relation("OwnerChatRooms")
+
+  @@map("users")
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String  @map("user_id")
+  type               String
+  provider           String
+  providerAccountId  String  @map("provider_account_id")
+  refresh_token      String? 
+  access_token       String? 
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? 
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtokens")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  userId    String   @map("user_id")
+  chatRoomId String  @map("chat_room_id")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model ChatRoom {
+  id        String    @id @default(cuid())
+  name      String?
+  createdAt DateTime  @default(now())
+  ownerId   String    @map("owner_id")
+
+  owner     User      @relation("OwnerChatRooms", fields: [ownerId], references: [id], onDelete: Cascade)
+  users     UserChatRoom[]
+  messages  Message[]
+
+  @@map("chat_rooms")
+}
+
+model UserChatRoom {
+  userId    String
+  chatRoomId String
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+
+  @@id([userId, chatRoomId])
+}
