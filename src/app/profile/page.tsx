@@ -38,7 +38,7 @@ export default function ProfilePage() {
             throw new Error('Failed to fetch user data');
           }
           const data: User = await response.json();
-          console.log('Fetched user data:', data);
+          // console.log('Fetched user data:', data);
           setUser(data);
           setName(data.name || '');
           setPassword(data.password || '');

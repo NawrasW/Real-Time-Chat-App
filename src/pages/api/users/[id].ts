@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -22,9 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (method === 'GET') {
     try {
-      const user = await prisma.user.findUnique({
-        where: { id },
-      });
+      const user = await prisma.user.findUnique({ where: { id } });
 
       if (user) {
         res.status(200).json(user);
@@ -47,37 +46,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         const name = Array.isArray(fields.name) ? fields.name[0] : fields.name ?? '';
         const password = Array.isArray(fields.password) ? fields.password[0] : fields.password ?? '';
+
+        // Check if the user has a Google account
+        const account = await prisma.account.findFirst({
+          where: { userId: id, provider: 'google' },
+        });
+
+        let hashedPassword = null;
+        if (password && !account) {
+          // Hash the password only if it's not a Google account and password is provided
+          const saltRounds = 10;
+          hashedPassword = await bcrypt.hash(password, saltRounds);
+        }
+
         let imagePath: string | null = null;
 
         if (files.image) {
           const file = Array.isArray(files.image) ? files.image[0] : files.image;
-          console.log('File received:', file);
           const data = fs.readFileSync(file.filepath);
 
           imagePath = path.join('/uploads', file.originalFilename || 'default.jpg');
           const uploadPath = path.join(process.cwd(), 'public', imagePath);
 
-          // Create the directory if it doesn't exist
           const directory = path.dirname(uploadPath);
           if (!fs.existsSync(directory)) {
             fs.mkdirSync(directory, { recursive: true });
           }
 
-          console.log('Saving file to:', uploadPath);
           fs.writeFileSync(uploadPath, data);
         }
 
-        console.log('Updating user with ID:', id);
+        // Update the user in the database
         const updatedUser = await prisma.user.update({
           where: { id },
           data: {
             name,
-            password,
+            password: hashedPassword || undefined, // Only set hashed password if it exists
             image: imagePath,
           },
         });
 
-        console.log('User updated successfully:', updatedUser);
         res.status(200).json(updatedUser);
       } catch (error) {
         console.error('Error updating user:', error);

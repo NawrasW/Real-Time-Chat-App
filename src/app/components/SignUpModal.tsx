@@ -1,14 +1,17 @@
 // src/components/SignUpModal.tsx
 "use client";
 import { useState, FormEvent } from 'react';
-
+import { useRouter } from 'next/navigation'; // Use for navigation
+import { signIn } from 'next-auth/react';
 const SignUpModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-
+  const router = useRouter();
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    // Send sign-up request
     const response = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: {
@@ -16,11 +19,27 @@ const SignUpModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void
       },
       body: JSON.stringify({ email, password, name })
     });
+  
     if (response.ok) {
       alert('User created successfully');
-      onClose();
+      try {
+        // Attempt to sign in the user
+        const result = await signIn('credentials', { email, password, redirect: false, callbackUrl: '/' });
+        
+        if (result?.error) {
+          // Handle sign-in error
+          alert('Failed to sign in: ' + result.error);
+        } else {
+          // Sign-in successful, redirect or do something
+          onClose();
+        }
+      } catch (error) {
+        console.error('Sign-in error:', error);
+        alert('Failed to sign in. Please try again.');
+      }
     } else {
-      alert('Failed to create user');
+      // Handle user creation error
+      alert('Failed to create user. Please try again.');
     }
   };
 

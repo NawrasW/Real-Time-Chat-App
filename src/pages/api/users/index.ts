@@ -8,6 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (method === 'GET') {
     const query = req.query.query as string | undefined;
+    console.log('Received query:', query); // Log query parameter
 
     try {
       if (typeof query !== 'string') {
@@ -20,11 +21,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             {
               name: {
                 contains: query, // Removed 'mode'
+                mode: 'insensitive', // Ensure case-insensitive search
               },
             },
             {
               email: {
                 contains: query, // Removed 'mode'
+                mode: 'insensitive', // Ensure case-insensitive search
               },
             },
           ],

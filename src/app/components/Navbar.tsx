@@ -23,10 +23,10 @@ export default function Navbar() {
  
 
   return (
-    <header className="flex h-20 w-full shrink-0 items-center px-4 md:px-6 border-b">
-      <Link href="/" className="mr-6 hidden lg:flex" prefetch={false}>
-        <MountainIcon className="h-6 w-6" />
-        <span className="sr-only">Acme Inc</span>
+    <header className="flex h-20 w-full shrink-0 items-center px-10 md:px-10 border-b  ">
+      <Link href="/" className="mr-6  lg:flex" prefetch={false}>
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSN9YS8q3nINAN0Lqqi0kcoEjJ8J3da95LwCw&s" alt="Logo" className="h-12 w-15"/>
+      
       </Link>
     
       <div className="flex-1">
@@ -105,12 +105,23 @@ function LogOutIcon(props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) {
   );
 }
 
-function MountainIcon(props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) {
+function MessageCircleIcon(props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) {
   return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
     </svg>
-  );
+  )
 }
 
 function UserIcon(props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) {

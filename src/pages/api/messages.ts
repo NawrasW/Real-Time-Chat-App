@@ -8,41 +8,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     const { chatRoomId } = req.query;
 
-    if (typeof chatRoomId !== 'string') {
-      return res.status(400).json({ error: 'Invalid chat room ID' });
-    }
+ if (!chatRoomId || typeof chatRoomId !== 'string') {
+  return res.status(400).json({ error: 'Invalid chat room ID' });
+}
 
-    try {
-      const messages = await prisma.message.findMany({
-        where: { chatRoomId },
-        orderBy: { createdAt: 'asc' },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true, // Include the user's image
-            },
-          },
+try {
+  const messages = await prisma.message.findMany({
+    where: { chatRoomId },
+    orderBy: { createdAt: 'asc' },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
         },
-      });
+      },
+    },
+  });
 
-      const formattedMessages = messages.map(message => ({
-        id: message.id,
-        content: message.content,
-        userId: message.userId,
-        createdAt: message.createdAt,
-        userImage: message.user.image, // Include the user's image in the response
-      }));
+  const formattedMessages = messages.map((message) => ({
+    id: message.id,
+    content: message.content,
+    userId: message.userId,
+    createdAt: message.createdAt,
+    userImage: message.user.image,
+  }));
 
-      res.status(200).json(formattedMessages);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      res.status(500).json({ error: 'Error fetching messages' });
-    }
+  res.status(200).json(formattedMessages);
+} catch (error) {
+  console.error('Error fetching messages:', error); // Detailed logging
+  res.status(500).json({ error: 'Internal server error' });
+}
   } else if (req.method === 'POST') {
     const { content, userId, chatRoomId } = req.body;
+
+    if (!content || typeof content !== 'string' || !userId || !chatRoomId) {
+      return res.status(400).json({ error: 'Missing or invalid required fields' });
+    }
+    
 
     try {
       const message = await prisma.message.create({
@@ -50,6 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           content,
           userId,
           chatRoomId,
+      
         },
       });
 
