@@ -13,11 +13,13 @@ export default function Navbar() {
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
 
-
+  useEffect(() => {
+    // console.log("Session object:", session);
+  }, [session]);
 
   useEffect(() => {
     // Log session and status for debugging
-   
+ 
   }, [status, session]);
 
  
@@ -47,6 +49,7 @@ export default function Navbar() {
               <UserIcon className="h-6 w-6" />
             )}
             <span className="sr-only">Toggle user menu</span>
+          
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-[180px]">

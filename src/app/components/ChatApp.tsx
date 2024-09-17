@@ -5,6 +5,7 @@ import { Sidebar } from "./Sidebar";
 import { useState } from "react";
 import { CustomUser } from "next-auth";
 import Navbar from "./Navbar";
+import AnimatedChatLoader from "./AnimatedChatLoader";
 
 export default function MainComponent() {
   const { data: session, status } = useSession();
@@ -19,7 +20,7 @@ export default function MainComponent() {
   if (status === 'loading') {
     return (
       <div className="flex h-screen justify-center items-center">
-               <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSN9YS8q3nINAN0Lqqi0kcoEjJ8J3da95LwCw&s" alt="Logo" className="h-12 w-15"/>
+              <AnimatedChatLoader />
 
       </div>
     );

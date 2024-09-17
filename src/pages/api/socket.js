@@ -7,10 +7,17 @@ const userSocketMap = new Map(); // Maps userId to socketId
 export default function handler(req, res) {
   if (!res.socket.server.io) {
     console.log('Setting up Socket.IO server...');
-    io = new Server(res.socket.server, {
+
+    // Dynamically set the origin based on the environment (development vs production)
+    const origin =
+      process.env.NODE_ENV === 'production'
+        ? 'https://real-time-chat-app-eta-eight.vercel.app/'  // production domain
+        : 'http://localhost:3000';  // Local development
+
+    const io = new Server(res.socket.server, {
       path: '/api/socket',
       cors: {
-        origin: 'http://localhost:3000',
+        origin: origin,
         methods: ['GET', 'POST'],
       },
     });

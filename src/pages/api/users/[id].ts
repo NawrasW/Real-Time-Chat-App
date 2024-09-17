@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 
 export const config = {
   api: {
-    bodyParser: false, // Disable Next.js body parsing to handle file uploads
+    bodyParser: false, // Disable body parsing to handle file uploads
   },
 };
 
@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     } catch (error) {
       console.error('Error fetching user:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ error: 'Internal server error' });
     }
   } else if (method === 'PUT') {
     const form = formidable({});
@@ -54,13 +54,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         let hashedPassword = null;
         if (password && !account) {
-          // Hash the password only if it's not a Google account and password is provided
           const saltRounds = 10;
           hashedPassword = await bcrypt.hash(password, saltRounds);
         }
 
         let imagePath: string | null = null;
 
+        // Check if an image is uploaded, else retain the existing image
         if (files.image) {
           const file = Array.isArray(files.image) ? files.image[0] : files.image;
           const data = fs.readFileSync(file.filepath);
@@ -74,6 +74,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
 
           fs.writeFileSync(uploadPath, data);
+        } else {
+          // If no new image is uploaded, keep the existing image path
+          const existingUser = await prisma.user.findUnique({ where: { id } });
+          if (existingUser?.image) {
+            imagePath = existingUser.image; // Retain the current image
+          }
         }
 
         // Update the user in the database
@@ -82,18 +88,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           data: {
             name,
             password: hashedPassword || undefined, // Only set hashed password if it exists
-            image: imagePath,
+            image: imagePath, // Update the image path, whether new or existing
           },
         });
 
-        res.status(200).json(updatedUser);
+        return res.status(200).json(updatedUser);
       } catch (error) {
         console.error('Error updating user:', error);
-        res.status(500).json({ error: 'Error updating user' });
+        return res.status(500).json({ error: 'Error updating user' });
       }
     });
   } else {
     res.setHeader('Allow', ['GET', 'PUT']);
-    res.status(405).end(`Method ${method} Not Allowed`);
+    return res.status(405).end(`Method ${method} Not Allowed`);
   }
 }

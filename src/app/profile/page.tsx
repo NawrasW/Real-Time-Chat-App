@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession, getSession, signIn} from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/app/components/ui/avatar';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -10,6 +10,7 @@ import { Input } from '@/app/components/ui/input';
 import '@/app/globals.css';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import AnimatedChatLoader from '../components/AnimatedChatLoader';
 
 interface User {
   id: string;
@@ -38,7 +39,6 @@ export default function ProfilePage() {
             throw new Error('Failed to fetch user data');
           }
           const data: User = await response.json();
-          // console.log('Fetched user data:', data);
           setUser(data);
           setName(data.name || '');
           setPassword(data.password || '');
@@ -51,8 +51,12 @@ export default function ProfilePage() {
       }
     };
   
-    fetchUserData();
+    // Only call fetchUserData if session is defined
+    if (session) {
+      fetchUserData();
+    }
   }, [session]);
+  
   
 
   const handleSaveChanges = async () => {
@@ -63,16 +67,29 @@ export default function ProfilePage() {
       if (image && typeof image !== 'string') {
         formData.append('image', image);
       }
-
+  
       try {
         const response = await fetch(`/api/users/${user.id}`, {
           method: 'PUT',
           body: formData,
         });
-
+  
         if (response.ok) {
           const updatedUserData = await response.json();
           setUser(updatedUserData);
+  
+          // Manually refresh the session with the updated data
+          const session = await getSession();
+          if (session) {
+            await signIn('credentials', {
+              redirect: false,  // Prevents automatic redirect
+              email: session.user.email,
+              password,  // Provide password if needed, otherwise leave empty
+            });
+          }
+  
+          // Optionally, force reload to ensure all components reflect the new session data
+          window.location.reload();
         } else {
           console.error('Error updating user:', response.statusText);
         }
@@ -83,7 +100,10 @@ export default function ProfilePage() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen bg-gray-100">Loading...</div>;
+    return   <div className="flex h-screen justify-center items-center">
+             <AnimatedChatLoader />
+
+</div>;
   }
 
   if (error) {
@@ -98,7 +118,7 @@ export default function ProfilePage() {
             <header className="bg-primary py-8 px-6 rounded-t-lg">
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={typeof image === 'string' ? image : '/placeholder-user.jpg'} />
+                  <AvatarImage src={user.image} />
                   <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div>
