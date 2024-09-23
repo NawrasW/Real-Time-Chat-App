@@ -18,9 +18,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ message: 'Missing fields' });
   }
 
-  const hashedPassword = await hash(password, 10);
-
   try {
+    // Check if a user with the provided email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      console.log("User already exists with this email:", email);
+      return res.status(409).json({ message: 'User already exists' });
+    }
+
+    // Hash the password before saving
+    const hashedPassword = await hash(password, 10);
+    console.log("Sign-up Hashed Password:", hashedPassword);
+    
     // Create the user in the database
     const user = await prisma.user.create({
       data: {
@@ -32,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log("User created successfully:", user);
 
-    // Instead of attempting to sign in, just return the created user and let the frontend handle login
+    // Return the created user and let the frontend handle login
     return res.status(201).json({ message: 'User created successfully', user });
   } catch (error: unknown) {
     if (error instanceof Error) {

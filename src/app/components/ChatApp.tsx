@@ -28,12 +28,11 @@ export default function MainComponent() {
 
   if (!currentUser) {
     return (
-      <div className="flex gap-2">            
-      <Navbar />
-      <div className="flex h-screen justify-center items-center">
-        
-        <div>Please log in to see chat rooms.</div>
-      </div>
+      <div className="flex flex-col h-screen">
+        <Navbar />
+        <div className="flex flex-1 justify-center items-center">
+          <div>Please log in to see chat rooms.</div>
+        </div>
       </div>
     );
   }

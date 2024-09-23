@@ -1,3 +1,4 @@
+// src/pages/api/users/[id].ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient } from '@prisma/client';
 import formidable from 'formidable';
@@ -6,6 +7,9 @@ import path from 'path';
 import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
+
+// Use a platform-specific temporary directory
+const tempDir = process.env.NODE_ENV === 'production' ? '/tmp'  : path.join(process.cwd(), 'temp'); 
 
 export const config = {
   api: {
@@ -35,7 +39,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Internal server error' });
     }
   } else if (method === 'PUT') {
-    const form = formidable({});
+    console.log('Temporary directory path:', tempDir);
+    console.log('Does the directory exist?', fs.existsSync(tempDir));
+
+    const form = formidable({ uploadDir: tempDir, keepExtensions: true });
 
     form.parse(req, async (err, fields, files) => {
       if (err) {

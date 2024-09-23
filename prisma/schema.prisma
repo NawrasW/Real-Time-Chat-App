@@ -8,6 +8,12 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum UserStatus {
+  online
+  offline
+}
+
+
 model User {
   id            String         @id @default(cuid())
   email         String         @unique
@@ -15,6 +21,7 @@ model User {
   password      String?
   emailVerified DateTime?      @map("email_verified")
   image         String?
+  status        UserStatus     @default(offline)
   chatRooms     UserChatRoom[]
   accounts      Account[]
   ownedRooms    ChatRoom[]     @relation("OwnerChatRooms")
@@ -23,6 +30,7 @@ model User {
 
   @@map("users")
 }
+
 
 model Account {
   id                String  @id @default(cuid())
