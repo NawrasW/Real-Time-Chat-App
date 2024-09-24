@@ -40,7 +40,7 @@ const SignInModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50">
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50 sm:mt-0 mt-60">
       <div className="bg-white p-6 rounded shadow-lg relative">
         <button onClick={onClose} className="absolute top-2 right-2 text-xl">×</button>
         <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
