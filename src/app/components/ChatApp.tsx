@@ -19,9 +19,10 @@ export default function MainComponent() {
 
   if (status === 'loading') {
     return (
-      <div className="flex h-screen justify-center items-center">
-              <AnimatedChatLoader />
+      <div className="flex h-screen justify-center items-center   ">
 
+              <AnimatedChatLoader size={70}  />
+              
       </div>
     );
   }

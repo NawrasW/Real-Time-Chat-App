@@ -6,7 +6,6 @@ import { useSession, getSession, signIn} from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/app/components/ui/avatar';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
-
 import '@/app/globals.css';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -22,13 +21,18 @@ interface User {
 
 export default function ProfilePage() {
   const { data: session } = useSession();
-
   const [user, setUser] = useState<User | null>(null);
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [image, setImage] = useState<string | File | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (session?.user?.name) {
+      setName(session.user.name);
+    }
+  }, [session]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -44,20 +48,26 @@ export default function ProfilePage() {
           setPassword(data.password || '');
           setImage(data.image || '');
           setLoading(false);
+          document.title = `${data.name}'s Profile`; // Manually update title
         } catch (error) {
           setError((error as Error).message);
           setLoading(false);
+          document.title = 'Profile Error'; // Set an error title
         }
+      } else {
+        document.title = 'Profile'; // Default title if no session
+        setLoading(false);
       }
     };
-  
-    // Only call fetchUserData if session is defined
+
     if (session) {
       fetchUserData();
+    } else {
+      document.title = 'Profile'; // Default title if no session
+      setLoading(false);
     }
   }, [session]);
-  
-  
+
 
   const handleSaveChanges = async () => {
     if (user) {
@@ -67,28 +77,25 @@ export default function ProfilePage() {
       if (image && typeof image !== 'string') {
         formData.append('image', image);
       }
-  
+
       try {
         const response = await fetch(`/api/users/${user.id}`, {
           method: 'PUT',
           body: formData,
         });
-  
+
         if (response.ok) {
           const updatedUserData = await response.json();
           setUser(updatedUserData);
-  
-          // Manually refresh the session with the updated data
+
           const session = await getSession();
           if (session) {
             await signIn('credentials', {
-              redirect: false,  // Prevents automatic redirect
+              redirect: false,
               email: session.user.email,
-              password,  // Provide password if needed, otherwise leave empty
+              password,
             });
           }
-  
-          // Optionally, force reload to ensure all components reflect the new session data
           window.location.reload();
         } else {
           console.error('Error updating user:', response.statusText);
@@ -100,10 +107,11 @@ export default function ProfilePage() {
   };
 
   if (loading) {
-    return   <div className="flex h-screen justify-center items-center">
-             <AnimatedChatLoader />
-
-</div>;
+    return (
+      <div className="flex h-screen justify-center items-center">
+        <AnimatedChatLoader />
+      </div>
+    );
   }
 
   if (error) {
@@ -128,54 +136,54 @@ export default function ProfilePage() {
               </div>
             </header>
             <Card className="rounded-b-lg">
-              <CardContent className="grid gap-6 p-6">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      placeholder="Enter your name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={user.email}
-                      readOnly
-                    />
-                  </div>
+            <CardContent className="grid gap-6 p-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="Enter your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
                 </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="image">Profile Image</Label>
-                    <Input
-                      id="image"
-                      type="file"
-                      onChange={(e) => setImage(e.target.files?.[0] || null)}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={user.email}
+                    readOnly
+                  />
                 </div>
-              </CardContent>
-              <CardFooter className="flex justify-end gap-2 p-6">
-                <Button variant="outline">Cancel</Button>
-                <Button onClick={handleSaveChanges}>Save Changes</Button>
-              </CardFooter>
-            </Card>
+              </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="image">Profile Image</Label>
+                  <Input
+                    id="image"
+                    type="file"
+                    onChange={(e) => setImage(e.target.files?.[0] || null)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end gap-2 p-6">
+              <Button variant="outline">Cancel</Button>
+              <Button onClick={handleSaveChanges}>Save Changes</Button>
+            </CardFooter>
+          </Card>
           </>
         ) : (
           <div className="text-center text-gray-500">No user data available.</div>

@@ -3,11 +3,10 @@ import { CustomUser } from 'next-auth';
 import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
 import { useSession } from 'next-auth/react';
-import { createClient, RealtimeChannel, RealtimeClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import styles from './../styles/ChatRoom.module.css';
 import { SendIcon } from 'lucide-react';
 import { GifSearch } from './GifSearch';
-
 
 interface Message {
   id: string;
@@ -22,10 +21,9 @@ interface ChatRoomProps {
   currentUser: CustomUser;
 }
 
-
 // Initialize Supabase client
 const supabase = createClient(
-   process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
@@ -48,7 +46,7 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
       if (error) {
         console.error('Error updating status:', error.message);
       } else {
-       // console.log(`User status updated to: ${status}`);
+        // console.log(`User status updated to: ${status}`);
       }
     } catch (err) {
       console.error('Error setting user status:', err);
@@ -99,7 +97,7 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
           filter: `chat_room_id=eq.${chatRoomId}`,
         },
         (payload) => {
-         // console.log('Received new message:', payload);
+          // console.log('Received new message:', payload);
           const newMessage = payload.new as Message;
 
           // Check if the message already exists in the state
@@ -112,14 +110,14 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
         }
       )
       .subscribe((status, err) => {
-       // console.log(`Message subscription status: ${status}`);
+        // console.log(`Message subscription status: ${status}`);
         if (err) {
           console.error('Error during message subscription:', err);
         }
         if (status === 'CHANNEL_ERROR') {
           console.error('Message channel error');
         } else if (status === 'CLOSED') {
-        //  console.log('Message channel closed');
+          //  console.log('Message channel closed');
         }
       });
 
@@ -171,7 +169,7 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
           filter: 'status=in.(online,offline)',
         },
         (payload) => {
-         // console.log('Received user status update:', payload);
+          // console.log('Received user status update:', payload);
           const updatedUser = payload.new;
 
           if (updatedUser.status === 'online' || updatedUser.status === 'offline') {
@@ -184,26 +182,27 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
         }
       )
       .subscribe((status, err) => {
-       // console.log(`User status subscription status: ${status}`);
+        // console.log(`User status subscription status: ${status}`);
         if (err) {
           console.error('Error during user status subscription:', err);
         } else {
-        //  console.log('Successfully subscribed to user status updates.');
+          //  console.log('Successfully subscribed to user status updates.');
         }
       });
 
     // Cleanup on unmount
     return () => {
-     // console.log('Unsubscribing from status channel');
+      // console.log('Unsubscribing from status channel');
       statusChannel.unsubscribe();
     };
   }, []);
 
   const handleSendMessage = async () => {
-    if (newMessage.trim() || selectedGif) {
+    const messageToSend = selectedGif ? selectedGif : newMessage.trim();
+    if (messageToSend) {
       const messageData: Partial<Message> = {
-        id: crypto.randomUUID(), // Generate a unique ID
-        content: selectedGif ? selectedGif : newMessage.trim(),
+        id: crypto.randomUUID(),
+        content: messageToSend,
         userId: currentUser.id,
         createdAt: new Date().toISOString(),
         userImage: currentUser.image!,
@@ -215,15 +214,12 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
 
       try {
         const { error } = await supabase.from('messages').insert({
-          id: messageData.id, // Include the ID
+          id: messageData.id,
           content: messageData.content,
           user_id: currentUser.id,
-          chat_room_id: chatRoomId, // Updated to use the correct column name
+          chat_room_id: chatRoomId,
         });
-
-        if (error) {
-          console.error('Error saving message:', error.message);
-        }
+        if (error) console.error('Error saving message:', error.message);
       } catch (error) {
         console.error('Error sending message:', error);
       }
@@ -240,12 +236,7 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, {
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-    });
+    return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric' });
   };
 
   const isDifferentDay = (currentDate: string, previousDate: string | null) => {
@@ -258,6 +249,17 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
     return url.endsWith('.gif') || url.includes('giphy.com');
   };
 
+  const handleCloseGifSearch = () => {
+    setShowGifSearch(false);
+  };
+
+  const handleGifSelect = (gifUrl: string) => {
+    setSelectedGif(gifUrl);
+    setShowGifSearch(false);
+    // Optionally, you could put some text in the textarea to indicate a GIF is selected
+    // setNewMessage('[GIF Selected]');
+  };
+
   return (
     <div className="flex-1 flex flex-col h-screen">
       <div className={`${styles.chatContainer} flex-1 overflow-auto p-4`} ref={messagesContainerRef}>
@@ -266,8 +268,6 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
             <div className="flex-1 p-4">Start the conversation by saying hello.</div>
           ) : (
             messages.map((msg, index) => {
-              
-         
               const previousMessage = index > 0 ? messages[index - 1] : null;
               const showDateLabel = isDifferentDay(msg.createdAt, previousMessage?.createdAt || null);
 
@@ -283,18 +283,13 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
                       ) : (
                         <UserIcon />
                       )}
-                  <div
-  className={`absolute top-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
-    userStatuses.get(msg.userId) === 'online'
-      ? 'bg-green-500'
-      : 'bg-red-500' // Default to red if the status is not online
-  }`}
-></div>
-
-
-
-
-
+                      <div
+                        className={`absolute top-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
+                          userStatuses.get(msg.userId) === 'online'
+                            ? 'bg-green-500'
+                            : 'bg-red-500' // Default to red if the status is not online
+                        }`}
+                      ></div>
                     </div>
                     <div
                       className={`grid gap-1 ${
@@ -321,17 +316,36 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
       </div>
       <div className="relative p-4 bg-muted/40">
         {showGifSearch && (
-          <div className="absolute inset-0 bg-white z-10">
-            <GifSearch onSelect={(gifUrl) => { setSelectedGif(gifUrl); setShowGifSearch(false); }} />
+          <div className="absolute bottom-full left-0 right-0 bg-white z-10 shadow-md rounded-md mb-2">
+            <GifSearch onSelect={handleGifSelect} onClose={handleCloseGifSearch} />
           </div>
         )}
-        <Textarea
-          placeholder="Type your message..."
-          className="w-full rounded-md bg-muted px-4 py-2 pr-16 resize-none"
-          rows={1}
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-        />
+        <div className="flex items-center">
+          {selectedGif ? (
+            <>
+              <img src={selectedGif} alt="Selected GIF" className="max-h-10 rounded-md mr-2" />
+              
+
+              <button onClick={() => setSelectedGif(null)} className="text-gray-500 hover:text-gray-700">
+            <svg className="h-6 w-6 fill-current" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+            </>
+          ) : (
+            <Textarea
+  placeholder="Type your message..."
+  className="w-full rounded-md bg-muted px-4 py-2 pr-16 resize-none min-h-[40px] max-h-[200px] overflow-y-auto"
+  value={newMessage}
+  onInput={(e) => {
+    const target = e.target as HTMLTextAreaElement;
+    target.style.height = 'auto'; // Reset height
+    target.style.height = `${target.scrollHeight}px`; // Set new height based on content
+    setNewMessage(target.value);
+  }}
+/>
+          )}
+        </div>
         <Button
           type="button"
           variant="ghost"
@@ -358,20 +372,21 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
 function UserIcon(props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) {
   return (
     <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-      className="h-10 w-10 rounded-full border border-gray-200"
-    >
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-      <path
-        d="M12 14.5c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm-6.93 5.36a8 8 0 0113.86 0"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+  viewBox="0 0 24 24"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+  {...props}
+  className="h-10 w-10 rounded-full border border-gray-200"
+>
+  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.2" />
+  <path
+    d="M12 14.5c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm-6.93 5.36a8 8 0 0113.86 0"
+    stroke="currentColor"
+    strokeWidth="1.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  />
+</svg>
+
   );
 }
