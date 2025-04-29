@@ -39,3 +39,10 @@ next-env.d.ts
 
 
 /localhost_files
+
+
+# Ignore all files in public/upload/
+public/upload/*
+
+# But keep the folder
+!public/upload/.gitkeep

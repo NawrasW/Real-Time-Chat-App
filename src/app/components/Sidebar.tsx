@@ -1,42 +1,83 @@
-import { SVGProps, useEffect, useState } from 'react';
-import { CustomUser } from 'next-auth';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { CustomUser, User } from 'next-auth';
 import { Input } from './ui/input';
-import { Loader2 } from 'lucide-react'; // Import the Loader2 icon
+import { createClient } from '@supabase/supabase-js';
+import { Loader2, UserIcon } from 'lucide-react';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface SidebarProps {
   currentUser: CustomUser;
   onSelectChatRoom: (chatRoomId: string) => void;
 }
 
+interface ChatRoom {
+  id: string;
+  otherUsers: User[];
+  lastMessageContent: string;
+  lastMessageDate: string | null;
+}
+
 export function Sidebar({ currentUser, onSelectChatRoom }: SidebarProps) {
-  const [chatRooms, setChatRooms] = useState<any[]>([]);
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<User[]>([]);
   const [loadingChatRooms, setLoadingChatRooms] = useState(true);
+  const [creatingChatRoom, setCreatingChatRoom] = useState(false);
+  const chatRoomsRef = useRef<ChatRoom[]>([]);
 
   useEffect(() => {
+    chatRoomsRef.current = chatRooms;
+  }, [chatRooms]);
+
+  const fetchInitialChatRooms = useCallback(async () => {
     setLoadingChatRooms(true);
-    fetch(`/api/chatrooms?userId=${currentUser.id}`)
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.error) {
-          console.error('Error fetching chat rooms:', data.error);
-          setChatRooms([]);
-        } else if (Array.isArray(data)) {
-          setChatRooms(data);
-        } else {
-          console.error('Expected an array but received:', data);
-          setChatRooms([]);
-        }
-      })
-      .catch((error) => {
-        console.error('Error fetching chat rooms:', error);
+    try {
+      const response = await fetch(`/api/chatrooms?userId=${currentUser.id}`);
+      const data = await response.json();
+      if (data.error) {
+        console.error('Error fetching chat rooms:', data.error);
         setChatRooms([]);
-      })
-      .finally(() => {
-        setLoadingChatRooms(false);
-      });
+      } else if (Array.isArray(data)) {
+        setChatRooms(data);
+      } else {
+        console.error('Expected an array but received:', data);
+        setChatRooms([]);
+      }
+    } catch (error) {
+      console.error('Error fetching chat rooms:', error);
+      setChatRooms([]);
+    } finally {
+      setLoadingChatRooms(false);
+    }
   }, [currentUser.id]);
+
+  useEffect(() => {
+    fetchInitialChatRooms();
+  }, [fetchInitialChatRooms]);
+
+  useEffect(() => {
+    const subscription = supabase
+      .channel('chat_room_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_rooms',
+        },
+        async () => {
+          await fetchInitialChatRooms();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [currentUser.id, fetchInitialChatRooms]);
 
   const handleSearch = () => {
     fetch(`/api/users?query=${searchQuery}`)
@@ -56,6 +97,7 @@ export function Sidebar({ currentUser, onSelectChatRoom }: SidebarProps) {
   };
 
   const handleSelectUser = async (userId: string) => {
+    setCreatingChatRoom(true);
     try {
       const response = await fetch('/api/chatrooms', {
         method: 'POST',
@@ -73,26 +115,21 @@ export function Sidebar({ currentUser, onSelectChatRoom }: SidebarProps) {
       }
 
       const data = await response.json();
-      console.log('Chat room response data:', data);
-
-      if (data.chatRoom && data.chatRoom.id) {
+      
+      if (data.chatRoom) {
+        await fetchInitialChatRooms();
         onSelectChatRoom(data.chatRoom.id);
-      } else {
-        console.error('Invalid chat room data:', data);
       }
     } catch (error) {
       console.error('Error creating or fetching chat room:', error);
+    } finally {
+      setCreatingChatRoom(false);
     }
-  };
-
-  const isGif = (content: string) => {
-    return content.toLowerCase().endsWith('.gif') || content.toLowerCase().includes('giphy.com');
   };
 
   return (
     <div className="flex h-screen w-1/4 min-w-[250px] p-4 border-r overflow-y-auto bg-primary text-white">
       <div className="w-full h-full">
-
         <p className="text-sm mb-2 text-gray-400">Search for users</p>
         <Input
           className="mb-4 w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2"
@@ -108,13 +145,22 @@ export function Sidebar({ currentUser, onSelectChatRoom }: SidebarProps) {
               <button
                 onClick={() => handleSelectUser(user.id)}
                 className="text-left w-full py-2 px-4 hover:bg-gray-600 flex items-center gap-4"
+                disabled={creatingChatRoom}
               >
                 {user.image ? (
-                  <img src={user.image} alt="User Profile" className="h-10 w-10 rounded-full" />
-                ) : (
-                  <UserIcon />
-                )}
+  <img
+    src={user.image}
+    alt="User Profile"
+    className="h-10 w-10 rounded-full object-cover"
+  />
+) : (
+  <div className="h-10 w-10 rounded-full bg-gray-600 flex items-center justify-center">
+    <UserIcon className="h-6 w-6 text-white" />
+  </div>
+)}
+
                 <span>{user.name || user.email}</span>
+                {creatingChatRoom && <Loader2 className="animate-spin h-4 w-4 ml-auto" />}
               </button>
             </li>
           ))}
@@ -126,19 +172,15 @@ export function Sidebar({ currentUser, onSelectChatRoom }: SidebarProps) {
         <ul className="mt-4">
           {loadingChatRooms ? (
             <div className="flex justify-center items-center py-4">
-              <Loader2 className="animate-spin h-6 w-6 text-white" /> {/* Use Loader2 */}
+              <Loader2 className="animate-spin h-6 w-6 text-white" />
             </div>
           ) : (
             chatRooms.map(chatRoom => {
               const receiver = chatRoom.otherUsers?.[0];
-
+              
               if (!receiver) {
-                console.error('No receiver found for chat room:', chatRoom.id);
                 return null;
               }
-
-              const lastMessage = chatRoom.lastMessageContent || 'No messages yet';
-              const isMessageGif = isGif(lastMessage);
 
               return (
                 <li key={chatRoom.id} className="mb-4">
@@ -146,35 +188,43 @@ export function Sidebar({ currentUser, onSelectChatRoom }: SidebarProps) {
                     onClick={() => onSelectChatRoom(chatRoom.id)}
                     className="flex justify-between w-full py-2 px-4 hover:bg-gray-700 items-center"
                   >
-                    <div className="flex items-center gap-4 ">
-                      {receiver.image ? (
-                        <img src={receiver.image} alt="User Profile" className="h-10 w-10 rounded-full" />
-                      ) : (
-                        <UserIcon />
-                      )}
+                    <div className="flex items-center gap-4">
+                    {receiver.image ? (
+ <img
+ src={
+   receiver.image ||
+   `https://ui-avatars.com/api/?name=${encodeURIComponent(receiver.name || 'User')}&background=555&color=fff`
+ }
+ alt="User Profile"
+ className="h-10 w-10 rounded-full object-cover"
+ onError={(e) => {
+   e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(receiver.name || 'User')}&background=555&color=fff`;
+ }}
+/>
+
+) : (
+  <div className="h-10 w-10 rounded-full bg-gray-600 flex items-center justify-center">
+    <UserIcon className="h-6 w-6 text-white" />
+  </div>
+)}
+
                       <div>
-                        <span className="font-bold text-sm j">{receiver.name}</span>
-                        <div className="text-xs text-gray-400">
-                          {isMessageGif ? 'GIF' : lastMessage}
-                        </div>
+                        <span className="font-bold text-sm">{receiver.name}</span>
+                        <div className="text-xs text-gray-400 truncate max-w-[180px]">
+  {chatRoom.lastMessageContent.length > 20
+    ? chatRoom.lastMessageContent.slice(0, 20) + '...'
+    : chatRoom.lastMessageContent}
+</div>
+
                       </div>
                     </div>
                   </button>
                 </li>
               );
-            })
+            }).filter(Boolean)
           )}
         </ul>
       </div>
     </div>
-  );
-}
-
-function UserIcon(props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
   );
 }

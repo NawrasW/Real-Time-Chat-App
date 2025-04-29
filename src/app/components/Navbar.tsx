@@ -38,19 +38,21 @@ export default function Navbar() {
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" className="rounded-full">
-            {session?.user?.image ? (
-              <img
-                src={session.user.image}
-                alt="User"
-                className="h-10 w-10 rounded-full"
-              />
-            ) : (
-              <UserIcon className="h-6 w-6" />
-            )}
-            <span className="sr-only">Toggle user menu</span>
-          
-          </Button>
+        <Button variant="outline" size="icon" className="rounded-full">
+  {session?.user?.image ? (
+    <img
+      src={session.user.image}
+      alt="User"
+      className="h-10 w-10 rounded-full"
+      onError={(e) => {
+        (e.currentTarget as HTMLImageElement).src = '/default-avatar.png';
+      }}
+    />
+  ) : (
+    <UserIcon className="h-6 w-6" />
+  )}
+  <span className="sr-only">Toggle user menu</span>
+</Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-[180px]">
           {session ? (

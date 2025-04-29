@@ -1,4 +1,3 @@
-// src/pages/api/chatrooms.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient } from '@prisma/client';
 
@@ -8,7 +7,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { method } = req;
 
   switch (method) {
-    // Handle GET requests to fetch chat rooms for a given user
     case 'GET':
       try {
         const { userId } = req.query;
@@ -17,7 +15,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(400).json({ error: 'Invalid or missing userId' });
         }
 
-        // Fetch chat rooms where the current user is involved
         const chatRooms = await prisma.chatRoom.findMany({
           where: {
             users: {
@@ -29,24 +26,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           include: {
             users: {
               include: {
-                user: true, // Include full user details
+                user: true,
               },
             },
             messages: {
               orderBy: {
                 createdAt: 'desc',
               },
-              take: 1, // Include the last message
+              take: 1,
             },
           },
         });
 
-        // Format chat rooms to match frontend expectations
         const formattedChatRooms = chatRooms.map(chatRoom => ({
           id: chatRoom.id,
           otherUsers: chatRoom.users.filter(userRelation => userRelation.userId !== userId).map(userRelation => userRelation.user),
           lastMessageContent: chatRoom.messages[0]?.content || 'No messages yet',
-          lastMessageDate: chatRoom.messages[0]?.createdAt || '',
+          lastMessageDate: chatRoom.messages[0]?.createdAt || null,
         }));
 
         return res.status(200).json(formattedChatRooms);
@@ -55,7 +51,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Internal server error' });
       }
 
-    // Handle POST requests to create or find a chat room
     case 'POST':
       try {
         const { userId1, userId2 } = req.body;
@@ -64,7 +59,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(400).json({ error: 'Both userId1 and userId2 are required' });
         }
 
-        // Check if a chat room already exists between the two users
         let chatRoom = await prisma.chatRoom.findFirst({
           where: {
             AND: [
@@ -75,50 +69,64 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           include: {
             users: {
               include: {
-                user: true, // Include full user details
+                user: true,
               },
             },
             messages: {
               orderBy: {
                 createdAt: 'desc',
               },
-              take: 1, // Include the last message
+              take: 1,
             },
           },
         });
 
-        // If no chat room exists, create a new one
         if (!chatRoom) {
-          // Create a new chat room if not found
           chatRoom = await prisma.chatRoom.create({
             data: {
               users: {
                 create: [
-                  { userId: userId1 }, // Adding the first user to the chat room
-                  { userId: userId2 }, // Adding the second user to the chat room
+                  { userId: userId1 },
+                  { userId: userId2 },
                 ],
               },
               owner: {
-                connect: { id: userId1 }, // Connect the owner to the first user
+                connect: { id: userId1 },
               },
             },
             include: {
               users: {
                 include: {
-                  user: true, // Include full user details
+                  user: true,
                 },
               },
               messages: {
                 orderBy: {
                   createdAt: 'desc',
                 },
-                take: 1, // Include the last message (if any)
+                take: 1,
               },
             },
           });
+
+          const formattedChatRoom = {
+            id: chatRoom.id,
+            otherUsers: chatRoom.users.filter(userRelation => userRelation.userId !== userId1).map(userRelation => userRelation.user),
+            lastMessageContent: chatRoom.messages[0]?.content || 'No messages yet',
+            lastMessageDate: chatRoom.messages[0]?.createdAt || null,
+          };
+
+          return res.status(200).json({ chatRoom: formattedChatRoom });
         }
 
-        return res.status(200).json({ chatRoom });
+        const formattedExistingChatRoom = {
+          id: chatRoom.id,
+          otherUsers: chatRoom.users.filter(userRelation => userRelation.userId !== userId1).map(userRelation => userRelation.user),
+          lastMessageContent: chatRoom.messages[0]?.content || 'No messages yet',
+          lastMessageDate: chatRoom.messages[0]?.createdAt || null,
+        };
+
+        return res.status(200).json({ chatRoom: formattedExistingChatRoom });
       } catch (error) {
         console.error('Error creating or fetching chat room:', error);
         return res.status(500).json({ error: 'Internal server error' });

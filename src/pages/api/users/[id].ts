@@ -80,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             fs.mkdirSync(directory, { recursive: true });
           }
 
-          fs.writeFileSync(uploadPath, data);
+          fs.writeFileSync(uploadPath, data as unknown as Uint8Array);
         } else {
           // If no new image is uploaded, keep the existing image path
           const existingUser = await prisma.user.findUnique({ where: { id } });

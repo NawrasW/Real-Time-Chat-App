@@ -14,6 +14,9 @@ interface Message {
   userId: string;
   createdAt: string;
   userImage?: string;
+  user: {
+    name: string;
+  };
 }
 
 interface ChatRoomProps {
@@ -26,9 +29,10 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
 export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [userStatuses, setUserStatuses] = useState<Map<string, 'online' | 'offline'>>(new Map());
+  const [userStatuses, setUserStatuses] = useState<Record<string, 'online' | 'offline'>>({});
   const [newMessage, setNewMessage] = useState<string>('');
   const [selectedGif, setSelectedGif] = useState<string | null>(null);
   const [showGifSearch, setShowGifSearch] = useState<boolean>(false);
@@ -37,16 +41,16 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
 
   // Function to update user status
   const updateUserStatus = async (status: 'online' | 'offline') => {
-    if (!currentUser || !currentUser.id) return;
+    if (!currentUser?.id) return;
+    
     try {
       const { error } = await supabase
         .from('users')
         .update({ status })
         .eq('id', currentUser.id);
+
       if (error) {
         console.error('Error updating status:', error.message);
-      } else {
-        // console.log(`User status updated to: ${status}`);
       }
     } catch (err) {
       console.error('Error setting user status:', err);
@@ -54,37 +58,74 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
   };
 
   useEffect(() => {
-    // Set status to 'online' on component mount and 'offline' on unmount
+    // Set status to 'online' on component mount
     updateUserStatus('online');
 
+    // Set up presence detection
+    const presenceChannel = supabase.channel('presence-channel', {
+      config: {
+        presence: {
+          key: currentUser.id,
+        },
+      },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const newState = presenceChannel.presenceState();
+        const statusUpdates: Record<string, 'online' | 'offline'> = {};
+        
+        Object.keys(newState).forEach((key) => {
+          statusUpdates[key] = 'online';
+        });
+        
+        setUserStatuses((prev) => ({
+          ...prev,
+          ...statusUpdates,
+        }));
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({ online_at: new Date().toISOString() });
+        }
+      });
+
     // Set user status to 'offline' on window close or tab change
-    const handleBeforeUnload = () => updateUserStatus('offline');
+    const handleBeforeUnload = () => {
+      updateUserStatus('offline');
+      presenceChannel.untrack();
+    };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      // Set user status to 'offline' on component unmount
+      // Cleanup on unmount
       updateUserStatus('offline');
+      presenceChannel.untrack();
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
-    // Fetch initial messages
-    fetch(`/api/messages?chatRoomId=${chatRoomId}`)
-      .then((response) => response.json())
-      .then((data) => {
+    const fetchMessages = async () => {
+      try {
+        const response = await fetch(`/api/messages?chatRoomId=${chatRoomId}`);
+        const data = await response.json();
         if (Array.isArray(data)) {
           setMessages(data);
         } else {
-          console.error('Expected an array but received:', data);
+          console.error('Error fetching messages:', data);
           setMessages([]);
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error('Error fetching messages:', error);
         setMessages([]);
-      });
+      }
+    };
 
+    fetchMessages();
+  }, [chatRoomId]);
+
+  useEffect(() => {
     // Subscribe to new messages
     const messageChannel = supabase
       .channel('public:messages')
@@ -97,58 +138,39 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
           filter: `chat_room_id=eq.${chatRoomId}`,
         },
         (payload) => {
-          // console.log('Received new message:', payload);
           const newMessage = payload.new as Message;
-
-          // Check if the message already exists in the state
           setMessages((prevMessages) => {
             if (!prevMessages.some((msg) => msg.id === newMessage.id)) {
               return [...prevMessages, newMessage];
             }
-            return prevMessages; // If the message already exists, don't add it again
+            return prevMessages;
           });
         }
       )
-      .subscribe((status, err) => {
-        // console.log(`Message subscription status: ${status}`);
-        if (err) {
-          console.error('Error during message subscription:', err);
-        }
-        if (status === 'CHANNEL_ERROR') {
-          console.error('Message channel error');
-        } else if (status === 'CLOSED') {
-          //  console.log('Message channel closed');
-        }
-      });
+      .subscribe();
 
-    // Cleanup on unmount
     return () => {
       messageChannel.unsubscribe();
     };
   }, [chatRoomId]);
 
   useEffect(() => {
-    // Fetch initial user statuses when the component mounts
+    // Fetch initial user statuses
     const fetchUserStatuses = async () => {
       try {
         const { data, error } = await supabase
           .from('users')
-          .select('id, status')
-          .in('status', ['online', 'offline']); // Fetch only online/offline statuses
+          .select('id, status');
 
-        if (error) {
-          console.error('Error fetching user statuses:', error);
-          return;
-        }
+        if (error) throw error;
 
         if (data) {
-          const statusMap = new Map<string, 'online' | 'offline'>();
+          const initialStatuses = data.reduce((acc, user) => {
+            acc[user.id] = user.status || 'offline';
+            return acc;
+          }, {} as Record<string, 'online' | 'offline'>);
 
-          data.forEach((user) => {
-            statusMap.set(user.id, user.status);
-          });
-
-          setUserStatuses(statusMap);
+          setUserStatuses(initialStatuses);
         }
       } catch (error) {
         console.error('Error fetching user statuses:', error);
@@ -159,40 +181,27 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
 
     // Subscribe to user status updates
     const statusChannel = supabase
-      .channel('public:users')
+      .channel('user-status-updates')
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'users',
-          filter: 'status=in.(online,offline)',
         },
         (payload) => {
-          // console.log('Received user status update:', payload);
           const updatedUser = payload.new;
-
-          if (updatedUser.status === 'online' || updatedUser.status === 'offline') {
-            setUserStatuses((prevStatuses) => {
-              const updatedStatuses = new Map(prevStatuses);
-              updatedStatuses.set(updatedUser.id, updatedUser.status);
-              return updatedStatuses;
-            });
+          if (updatedUser && updatedUser.id) {
+            setUserStatuses((prev) => ({
+              ...prev,
+              [updatedUser.id]: updatedUser.status || 'offline',
+            }));
           }
         }
       )
-      .subscribe((status, err) => {
-        // console.log(`User status subscription status: ${status}`);
-        if (err) {
-          console.error('Error during user status subscription:', err);
-        } else {
-          //  console.log('Successfully subscribed to user status updates.');
-        }
-      });
+      .subscribe();
 
-    // Cleanup on unmount
     return () => {
-      // console.log('Unsubscribing from status channel');
       statusChannel.unsubscribe();
     };
   }, []);
@@ -223,8 +232,6 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
       } catch (error) {
         console.error('Error sending message:', error);
       }
-    } else {
-      console.error('Message cannot be empty');
     }
   };
 
@@ -256,8 +263,6 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
   const handleGifSelect = (gifUrl: string) => {
     setSelectedGif(gifUrl);
     setShowGifSearch(false);
-    // Optionally, you could put some text in the textarea to indicate a GIF is selected
-    // setNewMessage('[GIF Selected]');
   };
 
   return (
@@ -270,30 +275,40 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
             messages.map((msg, index) => {
               const previousMessage = index > 0 ? messages[index - 1] : null;
               const showDateLabel = isDifferentDay(msg.createdAt, previousMessage?.createdAt || null);
+              const isCurrentUser = msg.userId === currentUser.id;
+              const userStatus = userStatuses[msg.userId] || 'offline';
 
               return (
                 <div key={msg.id}>
                   {showDateLabel && (
                     <div className="text-center text-xs text-gray-500 mb-2">{formatDate(msg.createdAt)}</div>
                   )}
-                  <div className={`flex items-start gap-4 ${msg.userId === currentUser.id ? '' : 'justify-end'}`}>
-                    <div className={`relative flex ${msg.userId === currentUser.id ? '' : 'order-2'}`}>
+<div className={`flex items-start gap-4 ${isCurrentUser ? 'justify-start' : 'justify-end'}`}>                 
+     <div className={`relative flex ${isCurrentUser ? 'order-2' : ''}`}>
                       {msg.userImage ? (
-                        <img src={msg.userImage} alt="user profile" className="h-10 w-10 rounded-full" />
+                        <img
+                        src={
+                          msg.userImage ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.user?.name || 'Unknown User')}&background=555&color=fff`
+                        }
+                        alt="User Profile"
+                        className="h-10 w-10 rounded-full"
+                        onError={(e) => {
+                          e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.user?.name || 'Unknown User')}&background=555&color=fff`;
+                        }}
+                      />
                       ) : (
                         <UserIcon />
                       )}
                       <div
                         className={`absolute top-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
-                          userStatuses.get(msg.userId) === 'online'
-                            ? 'bg-green-500'
-                            : 'bg-red-500' // Default to red if the status is not online
+                          userStatus === 'online' ? 'bg-green-500' : 'bg-red-500'
                         }`}
                       ></div>
                     </div>
                     <div
                       className={`grid gap-1 ${
-                        msg.userId === currentUser.id
+                        isCurrentUser
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-primary text-primary-foreground'
                       } rounded-md p-3 max-w-[75%]`}
@@ -324,26 +339,24 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
           {selectedGif ? (
             <>
               <img src={selectedGif} alt="Selected GIF" className="max-h-10 rounded-md mr-2" />
-              
-
               <button onClick={() => setSelectedGif(null)} className="text-gray-500 hover:text-gray-700">
-            <svg className="h-6 w-6 fill-current" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
+                <svg className="h-6 w-6 fill-current" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
             </>
           ) : (
             <Textarea
-  placeholder="Type your message..."
-  className="w-full rounded-md bg-muted px-4 py-2 pr-16 resize-none min-h-[40px] max-h-[200px] overflow-y-auto"
-  value={newMessage}
-  onInput={(e) => {
-    const target = e.target as HTMLTextAreaElement;
-    target.style.height = 'auto'; // Reset height
-    target.style.height = `${target.scrollHeight}px`; // Set new height based on content
-    setNewMessage(target.value);
-  }}
-/>
+              placeholder="Type your message..."
+              className="w-full rounded-md bg-muted px-4 py-2 pr-16 resize-none min-h-[40px] max-h-[200px] overflow-y-auto"
+              value={newMessage}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = 'auto';
+                target.style.height = `${target.scrollHeight}px`;
+                setNewMessage(target.value);
+              }}
+            />
           )}
         </div>
         <Button
@@ -372,21 +385,20 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
 function UserIcon(props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) {
   return (
     <svg
-  viewBox="0 0 24 24"
-  fill="none"
-  xmlns="http://www.w3.org/2000/svg"
-  {...props}
-  className="h-10 w-10 rounded-full border border-gray-200"
->
-  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.2" />
-  <path
-    d="M12 14.5c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm-6.93 5.36a8 8 0 0113.86 0"
-    stroke="currentColor"
-    strokeWidth="1.2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  />
-</svg>
-
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      className="h-10 w-10 rounded-full border border-gray-200"
+    >
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.2" />
+      <path
+        d="M12 14.5c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm-6.93 5.36a8 8 0 0113.86 0"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

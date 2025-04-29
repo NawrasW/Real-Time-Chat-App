@@ -5,7 +5,7 @@ export default function Component ({ size = 60 }: { size?: number }) {
   return (
     <div className="relative" style={{ width: size, height: size }}>
     <Image
-      src="/chatgpt-image.png"
+      src="/Logo.png"
       alt="Chattix"
       fill
       className="object-contain"
