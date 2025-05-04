@@ -8,40 +8,39 @@ const SignUpModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const router = useRouter();
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    
-    // Send sign-up request
-    const response = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ email, password, name })
-    });
-  
-    if (response.ok) {
-      alert('User created successfully');
-      try {
-        // Attempt to sign in the user
-        const result = await signIn('credentials', { email, password, redirect: false, callbackUrl: '/' });
-        
-        if (result?.error) {
-          // Handle sign-in error
-          alert('Failed to sign in: ' + result.error);
-        } else {
-          // Sign-in successful, redirect or do something
-          onClose();
-        }
-      } catch (error) {
-        console.error('Sign-in error:', error);
-        alert('Failed to sign in. Please try again.');
+  e.preventDefault();
+
+  const response = await fetch('/api/auth/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, name })
+  });
+
+  if (response.ok) {
+    try {
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        alert('Failed to sign in: ' + result.error);
+      } else {
+        onClose(); // Close modal first
+        router.push('/'); // Then navigate to homepage (or dashboard)
       }
-    } else {
-      // Handle user creation error
-      alert('Failed to create user. Please try again.');
+    } catch (error) {
+      console.error('Sign-in error:', error);
+      alert('Failed to sign in. Please try again.');
     }
-  };
+  } else {
+    alert('Failed to create user. Please try again.');
+  }
+};
+
 
   if (!isOpen) return null;
 

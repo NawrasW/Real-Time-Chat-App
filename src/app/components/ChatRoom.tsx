@@ -266,119 +266,166 @@ export function ChatRoom({ chatRoomId, currentUser }: ChatRoomProps) {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-screen">
-      <div className={`${styles.chatContainer} flex-1 overflow-auto p-4`} ref={messagesContainerRef}>
-        <div className="grid gap-4">
-          {messages.length === 0 ? (
-            <div className="flex-1 p-4">Start the conversation by saying hello.</div>
-          ) : (
-            messages.map((msg, index) => {
-              const previousMessage = index > 0 ? messages[index - 1] : null;
-              const showDateLabel = isDifferentDay(msg.createdAt, previousMessage?.createdAt || null);
-              const isCurrentUser = msg.userId === currentUser.id;
-              const userStatus = userStatuses[msg.userId] || 'offline';
+   <div className="flex-1 flex flex-col h-screen">
+  <div className={`${styles.chatContainer} flex-1 overflow-auto p-4`} ref={messagesContainerRef}>
+    <div className="grid gap-4">
+      {messages.length === 0 ? (
+        <div className="flex-1 p-4">Start the conversation by saying hello.</div>
+      ) : (
+        messages.map((msg, index) => {
+          const previousMessage = index > 0 ? messages[index - 1] : null;
+          const showDateLabel = isDifferentDay(msg.createdAt, previousMessage?.createdAt || null);
+          const isCurrentUser = msg.userId === currentUser.id;
+          const userStatus = userStatuses[msg.userId] || 'offline';
+          const name = msg.user?.name?.trim();
+const initialsName = name && name.length > 0 ? name : 'User';
 
-              return (
-                <div key={msg.id}>
-                  {showDateLabel && (
-                    <div className="text-center text-xs text-gray-500 mb-2">{formatDate(msg.createdAt)}</div>
-                  )}
-<div className={`flex items-start gap-4 ${isCurrentUser ? 'justify-start' : 'justify-end'}`}>                 
-     <div className={`relative flex ${isCurrentUser ? 'order-2' : ''}`}>
-                      {msg.userImage ? (
-                        <img
-                        src={
-                          msg.userImage ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.user?.name || 'Unknown User')}&background=555&color=fff`
-                        }
-                        alt="User Profile"
-                        className="h-10 w-10 rounded-full"
-                        onError={(e) => {
-                          e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.user?.name || 'Unknown User')}&background=555&color=fff`;
-                        }}
-                      />
-                      ) : (
-                        <UserIcon />
-                      )}
-                      <div
-                        className={`absolute top-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
-                          userStatus === 'online' ? 'bg-green-500' : 'bg-red-500'
-                        }`}
-                      ></div>
-                    </div>
-                    <div
-                      className={`grid gap-1 ${
-                        isCurrentUser
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-primary text-primary-foreground'
-                      } rounded-md p-3 max-w-[75%]`}
-                    >
-                      <div>
-                        {isGifUrl(msg.content) ? (
-                          <img src={msg.content} alt="GIF" className="max-w-full max-h-60 object-contain rounded-md" />
-                        ) : (
-                          <span>{msg.content}</span>
-                        )}
-                      </div>
-                      <div className="text-xs">{new Date(msg.createdAt).toLocaleTimeString([], { timeStyle: 'short' })}</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+          return (
+           <div key={msg.id}>
+  {showDateLabel && (
+    <div className="text-center text-xs text-gray-500 mb-2">
+      {formatDate(msg.createdAt)}
+    </div>
+  )}
+
+  <div
+    className={`flex items-end gap-2 ${
+      isCurrentUser ? 'justify-start' : 'justify-end'
+    }`}
+  >
+    {/* Left Avatar - Current User */}
+    {isCurrentUser && (
+      <div className="relative flex-shrink-0">
+        {msg.userImage ? (
+        <img
+          src={
+            msg.userImage ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(initialsName)}&background=555&color=fff`
+          }
+          alt="User Profile"
+          className="h-10 w-10 rounded-full object-cover"
+          onError={(e) => {
+            e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(initialsName)}&background=555&color=fff`;
+          }}
+        />
+      ) : (
+        <UserIcon />
+      )}
+        <div
+          className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
+            userStatus === 'online' ? 'bg-green-500' : 'bg-red-500'
+          }`}
+        ></div>
       </div>
-      <div className="relative p-4 bg-muted/40">
-        {showGifSearch && (
-          <div className="absolute bottom-full left-0 right-0 bg-white z-10 shadow-md rounded-md mb-2">
-            <GifSearch onSelect={handleGifSelect} onClose={handleCloseGifSearch} />
-          </div>
-        )}
-        <div className="flex items-center">
-          {selectedGif ? (
-            <>
-              <img src={selectedGif} alt="Selected GIF" className="max-h-10 rounded-md mr-2" />
-              <button onClick={() => setSelectedGif(null)} className="text-gray-500 hover:text-gray-700">
-                <svg className="h-6 w-6 fill-current" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </>
-          ) : (
-            <Textarea
-              placeholder="Type your message..."
-              className="w-full rounded-md bg-muted px-4 py-2 pr-16 resize-none min-h-[40px] max-h-[200px] overflow-y-auto"
-              value={newMessage}
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement;
-                target.style.height = 'auto';
-                target.style.height = `${target.scrollHeight}px`;
-                setNewMessage(target.value);
-              }}
-            />
-          )}
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="absolute top-1/2 right-16 transform -translate-y-1/2"
-          onClick={() => setShowGifSearch(!showGifSearch)}
-        >
-          GIF
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="absolute top-1/2 right-4 transform -translate-y-1/2"
-          onClick={handleSendMessage}
-        >
-          <SendIcon className="w-4 h-4" />
-        </Button>
+    )}
+
+    {/* Message Bubble */}
+    <div
+      className='grid gap-1 p-3 max-w-[75%] rounded-md bg-primary text-primary-foreground'
+     
+    >
+      {isGifUrl(msg.content) ? (
+        <img
+          src={msg.content}
+          alt="GIF"
+          className="max-w-full max-h-60 object-contain rounded-md"
+        />
+      ) : (
+        <span>{msg.content}</span>
+      )}
+      <div className="text-xs text-gray-400">
+        {new Date(msg.createdAt).toLocaleTimeString([], { timeStyle: 'short' })}
       </div>
     </div>
+
+    {/* Right Avatar - Receiver */}
+    {!isCurrentUser && (
+      <div className="relative flex-shrink-0">
+        {msg.userImage ? (
+        <img
+          src={
+            msg.userImage ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              msg.user?.name?.trim() || 'Unknown User'
+            )}&background=555&color=fff`
+          }
+          alt="User Profile"
+          className="h-10 w-10 rounded-full object-cover"
+          onError={(e) => {
+            e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              msg.user?.name?.trim() || 'Unknown User'
+            )}&background=555&color=fff`;
+          }}
+        /> 
+        ) : (
+          <UserIcon />
+        )}
+        <div
+          className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
+            userStatus === 'online' ? 'bg-green-500' : 'bg-red-500'
+          }`}
+        ></div>
+      </div>
+    )}
+  </div>
+</div>
+
+          );
+        })
+      )}
+    </div>
+  </div>
+  <div className="relative p-4 bg-muted/40">
+    {showGifSearch && (
+      <div className="absolute bottom-full left-0 right-0 bg-white z-10 shadow-md rounded-md mb-2">
+        <GifSearch onSelect={handleGifSelect} onClose={handleCloseGifSearch} />
+      </div>
+    )}
+    <div className="flex items-center">
+      {selectedGif ? (
+        <>
+          <img src={selectedGif} alt="Selected GIF" className="max-h-10 rounded-md mr-2" />
+          <button onClick={() => setSelectedGif(null)} className="text-gray-500 hover:text-gray-700">
+            <svg className="h-6 w-6 fill-current" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </>
+      ) : (
+        <Textarea
+          placeholder="Type your message..."
+          className="w-full rounded-md bg-muted px-4 py-2 pr-16 resize-none min-h-[40px] max-h-[200px] overflow-y-auto"
+          value={newMessage}
+          onInput={(e) => {
+            const target = e.target as HTMLTextAreaElement;
+            target.style.height = 'auto';
+            target.style.height = `${target.scrollHeight}px`;
+            setNewMessage(target.value);
+          }}
+        />
+      )}
+    </div>
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="absolute top-1/2 right-16 transform -translate-y-1/2"
+      onClick={() => setShowGifSearch(!showGifSearch)}
+    >
+      GIF
+    </Button>
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="absolute top-1/2 right-4 transform -translate-y-1/2"
+      onClick={handleSendMessage}
+    >
+      <SendIcon className="w-4 h-4" />
+    </Button>
+  </div>
+</div>
+
   );
 }
 
